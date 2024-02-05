@@ -1,5 +1,6 @@
 ---
-title: "Final Project Jeanan Al Aufy"
+title: "Ames Iowa Housing Dataset"
+"Associated with Stanford University"
 output:
   pdf_document: default
   html_document: default

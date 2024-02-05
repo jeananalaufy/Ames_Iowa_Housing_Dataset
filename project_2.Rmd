@@ -1,0 +1,243 @@
+---
+title: "Final Project Jeanan Al Aufy"
+output:
+  pdf_document: default
+  html_document: default
+date: "2023-08-17"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+# Loading libraries
+set.seed(124); rnorm(1)
+library(ggplot2)
+library(gridExtra)
+library(dplyr)
+
+```
+
+
+```{r}
+# Read the CSV file
+dataset = "C:/Users/USER/Downloads/ames2000_NAfix.csv"
+dataset= read.csv(dataset)
+print(colnames(dataset))
+
+```
+
+```{r}
+#Make all variables numeric
+
+#categorical_cols <- sapply(dataset, function(col) is.factor(col) || is.character(col))
+#dataset[categorical_cols] <- lapply(dataset[categorical_cols], factor)
+#formula <- as.formula(paste("~ .", collapse = " + "))
+#encoded_data <- model.matrix(formula, data = dataset)
+#encoded_data <- encoded_data[, -1]
+#dataset <- cbind(dataset, encoded_data)
+
+
+```
+
+```{r}
+#testing
+
+# Calculate the correlation coefficients
+numeric_columns <- sapply(dataset, is.numeric)
+correlation_with_saleprice <- cor(dataset$SalePrice, dataset[, numeric_columns])
+
+# Print the correlation coefficients
+print(correlation_with_saleprice)
+
+
+```
+
+
+```{r}
+#remove unneeded columns
+remove_columns = c("Alley", "Land.Slope", "Street", "Utilities", 
+                       "Condition.1", "Condition.2", "Roof.Style", "Roof.Matl", 
+                       "Heating", "Central.Air", "Functional", "Garage.Qual", 
+                       "Garage.Cond", "Paved.Drive", "X3Ssn.Porch", "Screen.Porch", 
+                       "Pool.Area", "Pool.QC", "X3Ssn.Porch", "Misc.Feature", 
+                       "Misc.Val", "Fence", "Utilities", "Low.Qual.Fin.SF")
+
+dataset <- dataset[, !(colnames(dataset) %in% remove_columns)]
+
+
+print(colnames(dataset))
+```
+
+```{r}
+#Split the data into two sets
+split = sample(nrow(dataset), size = 1000) 
+testing_data = dataset[split, ]  
+training_data = dataset[-split, ] 
+
+#Data analysis
+print(nrow(training_data)) #1000 rows
+print(nrow(testing_data)) #1000 rows
+print(ncol(training_data)) #80 columns
+print(ncol(testing_data)) #80 columns
+print(min(dataset$SalePrice)) #lowest price
+print(max(dataset$SalePrice)) #highest price
+print(mean(dataset$SalePrice)) #average price
+print(median(dataset$SalePrice)) #medaian price
+
+
+```
+
+```{r}
+#Histogram of price distribution
+library(ggplot2)
+
+ggplot(training_data, aes(x = SalePrice)) +
+  geom_histogram(binwidth = 5000, fill = "pink", color = "white") + 
+  labs(title = "Distribution of SalePrice",
+       x = "SalePrice",
+       y = "Count")
+
+#This histogram displays the distribution of sale price, the data is right skewed, this implies that there are more lower priced houses compared to higher priced ones. There are also outliers.
+
+
+```
+
+
+```{r}
+#When were most houses built
+
+barplot(table(training_data$Year.Built), 
+        main = "When were the most houses built?", 
+        xlab = "Year",
+        ylab = "Number of houses",)
+
+#It looks like there was a housing boom in the early 2000s. When I checked the frequency table, I found that most houses were built in 2005 (142 houses), followed by 138 houses in 2008. After that, the numbers started to decrease.
+```
+
+
+
+```{r}
+#Neighborhood distribution
+
+neighbourhoods = tapply(training_data$SalePrice, training_data$Neighborhood, median)
+neighbourhoods = sort(neighbourhoods, decreasing = TRUE)
+
+dotchart(neighbourhoods, pch = 21, bg = "pink",
+         cex = 0.85,
+         xlab="Average house price",
+         main = "Purchasing Houses based on Neighborhoods")
+
+#I opted for the median due to its resistance to outliers, unlike the average which can be skewed by extreme values. The graph demonstrates that neighborhood strongly impacts house prices. 
+
+```
+
+
+```{r}
+#Correlation Matrix
+
+#correlation between variables in the dataset
+
+library(dplyr)      
+library(corrplot) 
+
+numeric <- training_data %>% select(where(is.numeric))
+cor_matrix <- cor(numeric)
+corrplot(cor_matrix, method = "color")
+
+#From this matrix, in general I can see that TotRms,AbvGr is highly correlated to Gr.Liv.Area and Gr.Liv.Area is also highly correlated to TotRms.AbvGrd. Moving to predicitng sale prices, I can see that SalePrice is highly correlated to "Overall.Qual", "GR.Liv.Area", "X1st.Flr.SF", "Year.Built", "Year.Remod.Add" and  "TotRms.AbvGrd". (in order) meaning it is most correlated to the overall quality which is relevant as individuals would usually pay more for better quality, then the size of the house (GR.Liv.Area), then followed by the three variables which are "Year.Built", the remodel year (Year.Remod.Add) and the total rooms above ground (TotRms.AbvGrd).
+
+
+```
+
+
+```{r}
+#The model
+
+# Load necessary libraries
+library(dplyr)
+library(ggplot2)
+library(gridExtra)
+
+# Fit a linear regression model
+model <- lm(formula = SalePrice ~ Overall.Qual + Year.Built + Year.Remod.Add + Lot.Area + TotRms.AbvGrd + Kitchen.AbvGr + Gr.Liv.Area + Bedroom.AbvGr + Overall.Cond,
+            data = training_data)
+
+# Print summary of the model
+summary(model) # highest coefficient is Gr.Liv.Area
+
+# Diagnostic plots
+par(mfrow=c(2,2))
+plot(model)
+
+# Confidence intervals for the model coefficients
+conf_intervals <- confint(model)
+print(conf_intervals)
+
+# Get diagnostic plots
+diagnostic_plots <- plot(model)
+grid.arrange(diagnostic_plots[[1]], diagnostic_plots[[2]], diagnostic_plots[[3]], diagnostic_plots[[4]], ncol = 2)
+
+# Calculate R-squared on test data
+predicted_prices_test <- predict(model, newdata = testing_data)
+rsquared <- 1 - sum((testing_data$SalePrice - predicted_prices_test)^2) / sum((testing_data$SalePrice - mean(testing_data$SalePrice))^2)
+print(paste("R-squared value:", rsquared))
+
+```
+
+```{r}
+
+#Comparing datasets
+predicted_prices_test <- predict(model, newdata = testing_data)
+
+rounded_predicted_prices_test <- round(predicted_prices_test)
+
+comparison_df <- data.frame(Actual_SalePrice = testing_data$SalePrice,
+                            Predicted_SalePrice = rounded_predicted_prices_test)
+
+head(comparison_df)
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
